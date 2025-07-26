@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using GeoCubed.JWT.Common;
+using System.Text;
 
 namespace GeoCubed.JWT;
 
@@ -7,11 +8,41 @@ namespace GeoCubed.JWT;
 /// </summary>
 public class JsonWebToken
 {
+    /// <summary>
+    /// Gets or sets the header of the jwt.
+    /// </summary>
     public Header Header { get; set; }
 
+    /// <summary>
+    /// Gets or sets the payload of the jwt.
+    /// </summary>
     public Payload Payload { get; set; }
 
+    /// <summary>
+    /// Gets or sets the signature of the jwt.
+    /// </summary>
     public string Signaure { get; set; }
+
+    /// <summary>
+    /// Validates the token with a key.
+    /// </summary>
+    /// <param name="key">The key to use.</param>
+    /// <returns>True if valid, false otherwise.</returns>
+    public bool Validate(string key)
+    {
+        if (this.Header.alg != "HS256")
+        {
+            throw new Exception($"Hashing algorithm {this.Header.alg} is not supported yet.");
+        }
+
+        var hash = CryptographyHelper.HMACSHA256(this.Header.ToBase64UrlString(), this.Payload.ToBase64UrlString(), key);
+
+        var base64 = Convert.ToBase64String(hash);
+
+        var urlEncoded = EncodeDecodeHelper.ToUrlEncoded(base64);
+
+        return urlEncoded.Equals(this.Signaure);
+    }
 
     /// <summary>
     /// Encodes the data into a json web token.
@@ -41,6 +72,27 @@ public class JsonWebToken
     /// <returns>A class containing the decoded information.</returns>
     public static JsonWebToken FromToken(string token)
     {
-        throw new NotImplementedException();
+        // Split into 3 parts.
+        var parts = token.Split('.');
+
+        if (parts.Length != 3)
+        {
+            throw new Exception("Invalid token.");
+        }
+
+        var jwt = new JsonWebToken();
+
+        // Decode header.
+        var header = parts[0];
+        jwt.Header = Header.FromBase64UrlString(header);
+
+        // Decode payload.
+        var payload = parts[1];
+        jwt.Payload = Payload.FromBase64UrlEncoded(payload);
+
+        // Set signature.
+        jwt.Signaure = parts[2];
+
+        return jwt;
     }
 }
